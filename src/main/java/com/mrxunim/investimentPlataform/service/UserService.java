@@ -2,10 +2,12 @@ package com.mrxunim.investimentPlataform.service;
 
 import com.mrxunim.investimentPlataform.dto.CreateUserDTO;
 import com.mrxunim.investimentPlataform.dto.UpdatedUserDTO;
+import com.mrxunim.investimentPlataform.entity.Role;
 import com.mrxunim.investimentPlataform.entity.User;
 import com.mrxunim.investimentPlataform.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -18,6 +20,7 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public UUID createUser(CreateUserDTO createUserDTO) {
@@ -28,7 +31,8 @@ public class UserService {
         User userData = User.builder()
                 .username(createUserDTO.getUsername())
                 .email(createUserDTO.getEmail())
-                .password(createUserDTO.getPassword())
+                .password(passwordEncoder.encode(createUserDTO.getPassword())) // Hash da senha
+                .role(Role.USER) // Role padrão
                 .build();
 
         return userRepository.save(userData).getUserId();
@@ -39,7 +43,6 @@ public class UserService {
     }
 
     public Optional<User> getUserById(UUID userId) {
-
         return userRepository.findById(userId);
     }
 
@@ -47,11 +50,11 @@ public class UserService {
     public String updateUser(UUID userId, UpdatedUserDTO updatedUserDTO) {
         return userRepository.findById(userId)
                 .map(user -> {
-                    if (updatedUserDTO.getUsername() != null) {
+                    if (updatedUserDTO.getUsername() != null && !updatedUserDTO.getUsername().isBlank()) {
                         user.setUsername(updatedUserDTO.getUsername());
                     }
-                    if (updatedUserDTO.getPassword() != null) {
-                        user.setPassword(updatedUserDTO.getPassword());
+                    if (updatedUserDTO.getPassword() != null && !updatedUserDTO.getPassword().isBlank()) {
+                        user.setPassword(passwordEncoder.encode(updatedUserDTO.getPassword())); // Hash da nova senha
                     }
                     user.setUpdatedAt(Instant.now());
 
