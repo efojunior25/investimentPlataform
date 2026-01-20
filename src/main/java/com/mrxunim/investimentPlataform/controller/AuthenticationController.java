@@ -2,6 +2,7 @@ package com.mrxunim.investimentPlataform.controller;
 
 import com.mrxunim.investimentPlataform.dto.LoginRequestDTO;
 import com.mrxunim.investimentPlataform.dto.LoginResponseDTO;
+import com.mrxunim.investimentPlataform.dto.response.ApiResponse;
 import com.mrxunim.investimentPlataform.service.AuthenticationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,12 @@ public class AuthenticationController {
     private final AuthenticationService authenticationService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequestDTO request) {
+    public ResponseEntity<ApiResponse<LoginResponseDTO>> login(
+            @Valid @RequestBody LoginRequestDTO request) {
+
         LoginResponseDTO response = authenticationService.login(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                ApiResponse.success("Login realizado com sucesso", response)
+        );
     }
 }
