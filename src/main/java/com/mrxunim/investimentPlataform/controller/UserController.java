@@ -2,7 +2,10 @@ package com.mrxunim.investimentPlataform.controller;
 
 import com.mrxunim.investimentPlataform.dto.CreateUserDTO;
 import com.mrxunim.investimentPlataform.dto.UpdatedUserDTO;
+import com.mrxunim.investimentPlataform.dto.response.ApiResponse;
+import com.mrxunim.investimentPlataform.dto.response.UserResponseDTO;
 import com.mrxunim.investimentPlataform.entity.User;
+import com.mrxunim.investimentPlataform.exception.ForbiddenException;
 import com.mrxunim.investimentPlataform.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +29,14 @@ public class UserController {
      * Cadastro de novo usuário - endpoint público
      */
     @PostMapping
-    public ResponseEntity<Void> createUser(@Valid @RequestBody CreateUserDTO createUserDTO) {
-        UUID userId = userService.createUser(createUserDTO);
-        return ResponseEntity.created(URI.create("/v1/users/" + userId.toString())).build();
+    public ResponseEntity<ApiResponse<UserResponseDTO>> createUser(
+            @Valid @RequestBody CreateUserDTO createUserDTO) {
+
+        UserResponseDTO user = userService.createUser(createUserDTO);
+
+        return ResponseEntity
+                .created(URI.create("/v1/users/" + user.getUserId().toString()))
+                .body(ApiResponse.success("Usuário criado com sucesso", user));
     }
 
     /**
@@ -36,31 +44,55 @@ public class UserController {
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<User>> listUsers() {
-        return ResponseEntity.ok(userService.listUsers());
+    public ResponseEntity<ApiResponse<List<UserResponseDTO>>> listUsers() {
+        List<UserResponseDTO> users = userService.listUsers();
+        return ResponseEntity.ok(
+                ApiResponse.success("Usuários listados com sucesso", users)
+        );
     }
 
     /**
-     * Buscar usuário por ID - usuário autenticado pode ver seu próprio perfil ou ADMIN pode ver qualquer um
+     * Buscar usuário por ID
+     * Usuário pode ver seu próprio perfil ou ADMIN pode ver qualquer um
      */
     @GetMapping("/{userId}")
-    public ResponseEntity<User> getUserById(
-            @PathVariable("userId") String userId,
+    public ResponseEntity<ApiResponse<UserResponseDTO>> getUserById(
+            @PathVariable("userId") UUID userId,
             Authentication authentication) {
 
-        UUID requestedUserId = UUID.fromString(userId);
         User currentUser = (User) authentication.getPrincipal();
 
-        // Verifica se o usuário está tentando acessar seu próprio perfil ou se é ADMIN
-        if (!currentUser.getUserId().equals(requestedUserId) &&
+        // Verifica permissão
+        if (!currentUser.getUserId().equals(userId) &&
                 currentUser.getAuthorities().stream()
                         .noneMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"))) {
-            return ResponseEntity.status(403).build();
+            throw new ForbiddenException("Você não tem permissão para visualizar este perfil");
         }
 
-        return userService.getUserById(requestedUserId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        UserResponseDTO user = userService.getUserById(userId);
+        return ResponseEntity.ok(ApiResponse.success(user));
+    }
+
+    /**
+     * Atualizar usuário - apenas o próprio usuário
+     */
+    @PutMapping("/{userId}")
+    public ResponseEntity<ApiResponse<UserResponseDTO>> updateUser(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdatedUserDTO updatedUserDTO,
+            Authentication authentication) {
+
+        User currentUser = (User) authentication.getPrincipal();
+
+        // Verifica se está tentando atualizar seu próprio perfil
+        if (!currentUser.getUserId().equals(userId)) {
+            throw new ForbiddenException("Você só pode atualizar seu próprio perfil");
+        }
+
+        UserResponseDTO user = userService.updateUser(userId, updatedUserDTO);
+        return ResponseEntity.ok(
+                ApiResponse.success("Usuário atualizado com sucesso", user)
+        );
     }
 
     /**
@@ -68,32 +100,10 @@ public class UserController {
      */
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteById(@PathVariable("userId") String userId) {
-        userService.deleteById(UUID.fromString(userId));
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Atualizar usuário - apenas o próprio usuário pode se atualizar
-     */
-    @PutMapping("/{userId}")
-    public ResponseEntity<String> updateUser(
-            @PathVariable UUID userId,
-            @Valid @RequestBody UpdatedUserDTO updatedUserDTO,
-            Authentication authentication) {
-
-        User currentUser = (User) authentication.getPrincipal();
-
-        // Verifica se o usuário está tentando atualizar seu próprio perfil
-        if (!currentUser.getUserId().equals(userId)) {
-            return ResponseEntity.status(403).body("Você só pode atualizar seu próprio perfil");
-        }
-
-        try {
-            String result = userService.updateUser(userId, updatedUserDTO);
-            return ResponseEntity.ok(result);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteById(@PathVariable("userId") UUID userId) {
+        userService.deleteById(userId);
+        return ResponseEntity.ok(
+                ApiResponse.success("Usuário deletado com sucesso", null)
+        );
     }
 }
