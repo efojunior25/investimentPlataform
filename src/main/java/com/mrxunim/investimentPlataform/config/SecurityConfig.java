@@ -37,7 +37,12 @@ public class SecurityConfig {
                         // Endpoints públicos
                         .requestMatchers("/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/users").permitAll() // Cadastro público
-                        .requestMatchers("/actuator/**").permitAll() // Actuator público (ajuste conforme necessário)
+
+                        // Swagger/OpenAPI
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/api-docs/**").permitAll()
+
+                        // Actuator
+                        .requestMatchers("/actuator/**").permitAll()
 
                         // Endpoints protegidos apenas para ADMIN
                         .requestMatchers(HttpMethod.GET, "/v1/users").hasRole("ADMIN")
